@@ -1,75 +1,140 @@
-# 🎛️ RTL-SDR Scanner 📡
+# RTL-SDR Scanner
 
-A powerful and user-friendly software tool for scanning radio frequencies using RTL-SDR devices. This scanner covers a wide frequency range with customizable settings, real-time signal analysis, and an intuitive interface.
+A simple command-line spectrum scanner for RTL-SDR dongles. It sweeps a frequency range step by step, measures the signal power at each step, highlights frequencies that stand out above the noise floor, and plots the result.
 
-## 🚀 Features
-- 📶 **Wide Frequency Coverage**: Scan from 24 MHz to 1766 MHz.
-- ⚙️ **Customizable Settings**: Set start/stop frequencies and step sizes with optional default values.
-- 📊 **Real-Time Visualization**: Analyze and display signal strengths using a dynamic power spectrum plot.
-- ⏱️ **Efficient Scanning**: Utilizes a progress bar for better tracking.
-- 🖥️ **Interactive Menu**: Welcomes users with a stylish interface including author credit and GitHub link.
+![Python](https://img.shields.io/badge/python-3.8%2B-blue)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)
 
-## 🛠️ Installation
+## Features
 
-### Prerequisites
-Ensure you have Python 3 installed along with the following libraries:
-- `numpy`
-- `matplotlib`
-- `rtlsdr`
-- `tqdm`
+- Interactive prompts for start frequency, stop frequency and step size, with sensible defaults
+- Sweeps the full default RTL-SDR tuning range (24 MHz to 1766 MHz)
+- Progress bar while scanning
+- Automatic detection of high-power frequencies (anything above mean + 1 standard deviation)
+- Power-vs-frequency plot with matplotlib
 
-### Installation Steps
+## Requirements
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/timdigga/rtlsdrscanner
-   cd rtlsdrscanner
-   ```
+### Hardware
 
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+- An RTL-SDR USB dongle (RTL2832U-based, e.g. with an R820T/R820T2 tuner)
+- An antenna suitable for the range you want to scan
 
-3. **Run the scanner:**
-   ```bash
-   python rtl_sdr_freq_scanner.py
-   ```
+### Software
 
-4. **Follow the on-screen prompts** to start scanning.
+- Python 3.8 or newer
+- The `librtlsdr` driver library
+- These Python packages:
+  - `numpy`
+  - `matplotlib`
+  - `pyrtlsdr`
+  - `tqdm`
 
-## 🔍 Usage
+## Installation
 
-The program will prompt you to enter the start and stop frequencies, as well as the step size. Press **Enter** to use the default values.
+### 1. Install the RTL-SDR driver
 
-## 📡 Example
+**Debian / Ubuntu**
+
+```bash
+sudo apt install rtl-sdr librtlsdr-dev
+```
+
+**macOS (Homebrew)**
+
+```bash
+brew install librtlsdr
+```
+
+**Windows**
+
+Use [Zadig](https://zadig.akeo.ie/) to install the WinUSB driver for the dongle, and make sure `librtlsdr.dll` is on your `PATH`.
+
+### 2. Clone the repository
+
+```bash
+git clone https://github.com/d4v0l4p/rtlsdrscanner.git
+cd rtlsdrscanner
+```
+
+### 3. Install the Python dependencies
+
+```bash
+pip install numpy matplotlib pyrtlsdr tqdm
+```
+
+Or, if you add a `requirements.txt`:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+Plug in your RTL-SDR dongle and run:
+
+```bash
+python scanner.py
+```
+
+You will be prompted for the scan parameters. Press **Enter** to accept a default:
 
 ```
-################################################
-#                                              #
-#              RTL SDR SCANNER                #
-#                                              #
-#                by Tim Digga                 #
-#    GitHub: https://github.com/timdigga       #
-#                                              #
-################################################
-
 Enter start frequency in MHz (default 24):
 Enter stop frequency in MHz (default 1766):
 Enter step size in kHz (default 200):
-
-Scanning from 24.0 MHz to 1766.0 MHz...
-Scanning frequencies: 100%|████████████████████| 1000/1000 [00:30<00:00, 33.33 freq/s]
-High-power frequencies detected at (MHz): [88.5, 101.7, 145.0]
 ```
 
-## 🤝 Contributing
+### Example: scan the FM broadcast band
 
-Feel free to submit issues or fork the repository to contribute improvements.
+```
+Enter start frequency in MHz (default 24): 88
+Enter stop frequency in MHz (default 1766): 108
+Enter step size in kHz (default 200): 100
+```
 
-## 🤓 About the Author
-Developed with passion by **Tim Digga**.  
-GitHub: [timdigga](https://github.com/timdigga)
+When the sweep finishes, the scanner prints the frequencies it flagged and opens a plot:
 
-## 📜 License
-MIT License.
+```
+High-power frequencies detected at (MHz): [ 89.1  94.5  98.8 101.3 ]
+```
+
+## How it works
+
+1. The dongle is set to a 2.4 MHz sample rate with automatic gain.
+2. For each frequency step, the tuner is moved to that centre frequency and 131,072 IQ samples are read.
+3. An FFT of the samples gives the power spectrum, and its mean is converted to decibels.
+4. After the sweep, any step whose power is more than one standard deviation above the mean is reported as a high-power frequency.
+5. The power levels are plotted against frequency.
+
+## Notes and limitations
+
+- **Power values are relative**, not calibrated dBm. They are good for spotting where activity is, not for absolute measurements.
+- **Automatic gain** can shift between steps, which may make some readings inconsistent. Setting a fixed gain gives more comparable results.
+- **Full-range scans take time.** The default sweep (24–1766 MHz at 200 kHz) is about 8,700 steps.
+- The frequency range your dongle actually supports depends on its tuner chip.
+
+## Troubleshooting
+
+**`usb_claim_interface error -6` (Linux)**
+The kernel's DVB-T driver has claimed the device. Unload it and blacklist it:
+
+```bash
+sudo rmmod dvb_usb_rtl28xxu
+echo 'blacklist dvb_usb_rtl28xxu' | sudo tee /etc/modprobe.d/blacklist-rtl.conf
+```
+
+**`LibUSBError` or "No devices found"**
+Check that the dongle is plugged in and that `rtl_test` can see it. On Linux you may need udev rules (included with the `rtl-sdr` package) or to run as a user in the `plugdev` group.
+
+**`OSError: Error loading librtlsdr`**
+The driver library is not installed or not on your library path. See the installation steps above.
+
+## Author
+
+**Tim Digga**
+GitHub: [@timdigga](https://github.com/timdigga)
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
