@@ -25,7 +25,7 @@ On Windows, install the WinUSB driver for the stick with [Zadig](https://zadig.a
 ```bash
 git clone https://github.com/d4v0l4p/rtlsdrscanner.git
 cd rtlsdrscanner
-pip install numpy matplotlib pyrtlsdr tqdm
+pip install -r requirements.txt
 ```
 
 ## Usage
